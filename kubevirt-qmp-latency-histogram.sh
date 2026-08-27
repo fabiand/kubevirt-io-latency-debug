@@ -5,7 +5,7 @@ VM_NAME=$2
 DISK_ALIAS=${3:-rootdisk}
 
 if [ -z "$CMD" -o -z "$VM_NAME" ]; then
-    echo "Usage: $0 <setup|query> <vm-name>"
+    echo "Usage: $0 <setup|query|clean> <vm-name>"
     exit 1
 fi
 
@@ -50,11 +50,20 @@ kubectl exec "$POD_NAME" -c compute -- virsh qemu-monitor-command 1 \
     jq --arg qdev "$DEVICE" '.return[] | select(.qdev == $qdev or .device == $qdev)' | jq 'reduce (paths(scalars) as $p | select(any($p[]; type == "string" and contains("histo"))) | {path: $p, value: getpath($p)}) as $item ({}; setpath($item.path; $item.value))'
   ;;
 
+  clean)
+
+# Disable the latency histogram by calling block-latency-histogram-set with no boundaries
+echo "Disabling latency histogram..."
+kubectl exec "$POD_NAME" -c compute -- virsh qemu-monitor-command 1 \
+    '{"execute": "block-latency-histogram-set", "arguments": {"id": "'$TARGET_ID'"}}'
+
+  ;;
+
   *)
   cat <<EOF
 UNKNOWN COMMAND '$CMD'
 
 Usage:
-$0 setup|query <VM NAME>
+$0 setup|query|clean <VM NAME>
 EOF
 esac
